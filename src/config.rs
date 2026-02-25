@@ -1,4 +1,8 @@
-use crate::{models::AppState, repositories::ProductRepository, routes};
+use crate::{
+    models::{AppState, Config, DefaultOnCreate, OnCreateHandler},
+    repositories::ProductRepository,
+    routes,
+};
 use actix_web::web::{self, ServiceConfig};
 use auth_middleware::Auth;
 use ferrumec::Permission;
@@ -7,7 +11,7 @@ use std::env;
 
 #[derive(Clone)]
 pub struct CatalogModule {
-    state: AppState,
+    state: web::Data<AppState>,
 }
 
 #[derive(Clone)]
@@ -16,20 +20,32 @@ pub struct Permissions {
 }
 
 impl CatalogModule {
-    pub async fn new(perms: Vec<Permission>) -> Result<Self, Error> {
+    async fn default_pool() -> Result<Pool<Sqlite>, Error> {
         let database_url =
             env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://catalog.db?mode=rwc".to_string());
 
-        let pool: Pool<Sqlite> = SqlitePoolOptions::new()
+        Ok(SqlitePoolOptions::new()
             .max_connections(5)
             .connect(&database_url)
-            .await?;
-        let repo = ProductRepository::new(pool).await?;
+            .await?)
+    }
+
+    async fn default_repo() -> Result<ProductRepository, Error> {
+        Ok(ProductRepository::new(CatalogModule::default_pool().await?).await?)
+    }
+
+    /// Construct catalog web module using default values.
+    /// The default values are: db and on_create handler
+    pub async fn default(perms: Vec<Permission>) -> Result<Self, Error> {
+        let repo = CatalogModule::default_repo().await?;
         let state = AppState {
             repo,
             permissions: CatalogModule::set_permissions(perms),
+            on_create_product: Box::new(DefaultOnCreate {}),
         };
-        Ok(Self { state })
+        Ok(Self {
+            state: web::Data::new(state),
+        })
     }
 
     pub fn get_permissions() -> Vec<String> {
@@ -42,10 +58,23 @@ impl CatalogModule {
         }
     }
 
+    pub async fn new(cfg: Config) -> Result<CatalogModule, Error> {
+        let state = AppState {
+            repo: cfg.repo.unwrap_or(CatalogModule::default_repo().await?),
+            permissions: cfg.permissions.unwrap(),
+            on_create_product: cfg
+                .on_create_product
+                .unwrap_or(Box::new(DefaultOnCreate {})),
+        };
+        Ok(Self {
+            state: web::Data::new(state),
+        })
+    }
+
     pub fn config(&self, cfg: &mut ServiceConfig, namespace: &str) {
         cfg.service(
             web::scope(namespace)
-                .app_data(web::Data::new(self.state.clone()))
+                .app_data(self.state.clone())
                 .service(routes::list_products)
                 .service(routes::get_product)
                 .service(routes::get_product_by_slug)

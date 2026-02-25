@@ -14,3 +14,4 @@ dotenvy = "0.15"
 thiserror = "1"
 auth_middleware = {path="../auth_middleware"}
 ferrumec = {path="../ferrumec"}
+async-trait = "0.1.89"

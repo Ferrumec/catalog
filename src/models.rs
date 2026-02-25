@@ -1,7 +1,9 @@
+use async_trait::async_trait;
+use ferrumec::Permission;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-use crate::{config::Permissions, repositories::ProductRepository};
+use crate::{CatalogModule, config::Permissions, repositories::ProductRepository};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Product {
@@ -14,7 +16,7 @@ pub struct Product {
     pub created_at: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CreateProductDto {
     pub name: String,
     pub description: Option<String>,
@@ -32,8 +34,46 @@ pub struct ProductQuery {
     pub offset: Option<i64>,
 }
 
-#[derive(Clone)]
+#[async_trait]
+pub trait OnCreateHandler: Send + Sync {
+    async fn handle(&self, dto: CreateProductDto) -> bool;
+}
+
+pub struct DefaultOnCreate;
+
+#[async_trait]
+impl OnCreateHandler for DefaultOnCreate {
+    async fn handle(&self, dto: CreateProductDto) -> bool {
+        println!("Default on create handler: {}", dto.name);
+        true
+    }
+}
 pub struct AppState {
     pub repo: ProductRepository,
     pub permissions: Permissions,
+    pub on_create_product: Box<dyn OnCreateHandler>,
+}
+
+pub struct Config {
+    pub repo: Option<ProductRepository>,
+    pub permissions: Option<Permissions>,
+    pub on_create_product: Option<Box<dyn OnCreateHandler>>,
+}
+
+impl Config {
+    pub fn new() -> Self {
+        Self {
+            repo: None,
+            permissions: None,
+            on_create_product: None,
+        }
+    }
+    pub fn with_on_create(mut self, on_create: Box<dyn OnCreateHandler>) -> Self {
+        self.on_create_product = Some(on_create);
+        self
+    }
+    pub fn with_perms(mut self, perms: Vec<Permission>) -> Self {
+        self.permissions = Some(CatalogModule::set_permissions(perms));
+        self
+    }
 }

@@ -11,8 +11,12 @@ pub async fn create_product(
     if !state.permissions.create_product.check(claims.into_inner()) {
         return HttpResponse::Unauthorized().finish();
     }
-    match state.repo.create(payload.into_inner()).await {
-        Ok(product) => HttpResponse::Created().json(product),
+    let dto = payload.into_inner();
+    match state.repo.create(dto.clone()).await {
+        Ok(product) => {
+            state.on_create_product.handle(dto).await;
+            HttpResponse::Created().json(product)
+        }
         Err(err) => {
             eprintln!("Error: {:?}", err);
             HttpResponse::InternalServerError().finish()
