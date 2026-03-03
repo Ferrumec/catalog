@@ -1,6 +1,7 @@
 use crate::models::{AppState, CreateProductDto, ProductQuery};
 use actix_web::{HttpResponse, Responder, get, post, web};
 use auth_middleware::Claims;
+use ferrumec::CreateItem;
 
 #[post("/products")]
 pub async fn create_product(
@@ -14,8 +15,16 @@ pub async fn create_product(
     let dto = payload.into_inner();
     match state.repo.create(dto.clone()).await {
         Ok(product) => {
-            state.on_create_product.handle(dto).await;
-            HttpResponse::Created().json(product)
+            let prod = product.clone();
+            state
+                .on_create_product
+                .handle(CreateItem {
+                    id: product.id,
+                    sku: product.sku,
+                    quantity: dto.qty,
+                })
+                .await;
+            HttpResponse::Created().json(prod)
         }
         Err(err) => {
             eprintln!("Error: {:?}", err);

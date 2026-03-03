@@ -62,8 +62,8 @@ impl ProductRepository {
         let created_at = Utc::now().timestamp_micros();
         let slug = generate_slug(&dto.name);
         sqlx::query(
-            "INSERT INTO products (id, name, slug, description, price, category, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO products (id, name, slug, description, price, category, created_at, sku)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         )
         .bind(id.clone())
         .bind(&dto.name)
@@ -72,6 +72,7 @@ impl ProductRepository {
         .bind(dto.price)
         .bind(dto.category.clone())
         .bind(created_at)
+        .bind(dto.sku.clone())
         .execute(&self.pool)
         .await?;
 
@@ -79,6 +80,7 @@ impl ProductRepository {
             id,
             name: dto.name,
             slug: slug,
+            sku: dto.sku,
             description: dto.description,
             price: dto.price,
             category: dto.category,
@@ -88,7 +90,7 @@ impl ProductRepository {
 
     pub async fn find_by_id(&self, id: String) -> Result<Option<Product>, sqlx::Error> {
         let row = sqlx::query(
-            "SELECT id, name, slug, description, price, category, created_at
+            "SELECT id, name, slug, description, price, category, created_at, sku
              FROM products
              WHERE id = ?1",
         )
@@ -106,6 +108,7 @@ impl ProductRepository {
             description: row.try_get("description")?,
             price: row.try_get("price")?,
             slug: row.try_get("slug")?,
+            sku: row.try_get("sku")?,
             category: row.try_get("category")?,
             created_at: row.try_get("created_at")?,
         }))
@@ -113,7 +116,7 @@ impl ProductRepository {
 
     pub async fn find_all(&self, query: ProductQuery) -> Result<Vec<Product>, sqlx::Error> {
         let mut qb = QueryBuilder::new(
-            "SELECT id, name,slug, description, price, category, created_at FROM products WHERE 1=1",
+            "SELECT id, name,slug, sku, description, price, category, created_at FROM products WHERE 1=1",
         );
 
         qb = build_filters(qb, query);
@@ -145,6 +148,7 @@ impl ProductRepository {
             name: row.try_get("name")?,
             description: row.try_get("description")?,
             price: row.try_get("price")?,
+            sku: row.try_get("sku")?,
             category: row.try_get("category")?,
             slug: row.try_get("slug")?,
             created_at: row.try_get("created_at")?,
@@ -161,6 +165,7 @@ impl ProductRepository {
             description TEXT,
             price REAL NOT NULL,
             category TEXT NOT NULL,
+            sku TEXT NOT NULL,
             created_at INTEGER NOT NULL
         );
 

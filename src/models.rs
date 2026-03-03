@@ -1,17 +1,18 @@
 use async_trait::async_trait;
-use ferrumec::Permission;
+use ferrumec::{CreateItem, OnCreateHandler, Permission};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 use crate::{CatalogModule, config::Permissions, repositories::ProductRepository};
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
 pub struct Product {
     pub id: String,
     pub name: String,
     pub slug: String,
     pub description: Option<String>,
     pub price: f64,
+    pub sku: String,
     pub category: String,
     pub created_at: i64,
 }
@@ -22,6 +23,8 @@ pub struct CreateProductDto {
     pub description: Option<String>,
     pub price: f64,
     pub category: String,
+    pub qty: u32,
+    pub sku: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,30 +37,26 @@ pub struct ProductQuery {
     pub offset: Option<i64>,
 }
 
-#[async_trait]
-pub trait OnCreateHandler: Send + Sync {
-    async fn handle(&self, dto: CreateProductDto) -> bool;
-}
-
 pub struct DefaultOnCreate;
 
 #[async_trait]
 impl OnCreateHandler for DefaultOnCreate {
-    async fn handle(&self, dto: CreateProductDto) -> bool {
-        println!("Default on create handler: {}", dto.name);
+    type Dto = CreateItem;
+    async fn handle(&self, dto: CreateItem) -> bool {
+        println!("Default on create handler: {}", dto.id);
         true
     }
 }
 pub struct AppState {
     pub repo: ProductRepository,
     pub permissions: Permissions,
-    pub on_create_product: Box<dyn OnCreateHandler>,
+    pub on_create_product: Box<dyn OnCreateHandler<Dto = CreateItem>>,
 }
 
 pub struct Config {
     pub repo: Option<ProductRepository>,
     pub permissions: Option<Permissions>,
-    pub on_create_product: Option<Box<dyn OnCreateHandler>>,
+    pub on_create_product: Option<Box<dyn OnCreateHandler<Dto = CreateItem>>>,
 }
 
 impl Config {
@@ -68,7 +67,7 @@ impl Config {
             on_create_product: None,
         }
     }
-    pub fn with_on_create(mut self, on_create: Box<dyn OnCreateHandler>) -> Self {
+    pub fn with_on_create(mut self, on_create: Box<dyn OnCreateHandler<Dto = CreateItem>>) -> Self {
         self.on_create_product = Some(on_create);
         self
     }
