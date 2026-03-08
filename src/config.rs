@@ -5,7 +5,6 @@ use crate::{
 };
 use actix_web::web::{self, ServiceConfig};
 use auth_middleware::Auth;
-use ferrumec::OnCreateHandler;
 use ferrumec::Permission;
 use sqlx::{Error, Pool, Sqlite, sqlite::SqlitePoolOptions};
 use std::env;
