@@ -1,7 +1,11 @@
+use std::time::Duration;
+
 use async_trait::async_trait;
 use ferrumec::{CreateItem, OnCreateHandler, Permission};
+use moka::future::Cache;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use tera::Tera;
 
 use crate::{CatalogModule, config::Permissions, repositories::ProductRepository};
 
@@ -47,7 +51,23 @@ impl OnCreateHandler for DefaultOnCreate {
         true
     }
 }
+
+pub struct Caches {
+    pub catalog_page: Cache<String, String>,
+}
+
+impl Caches {
+    pub fn new() -> Self {
+        let catalog_page = Cache::builder()
+            .time_to_live(Duration::from_secs(60))
+            .max_capacity(100)
+            .build();
+        Self { catalog_page }
+    }
+}
 pub struct AppState {
+    pub caches: Caches,
+    pub tera: Tera,
     pub repo: ProductRepository,
     pub permissions: Permissions,
     pub on_create_product: Box<dyn OnCreateHandler<Dto = CreateItem>>,

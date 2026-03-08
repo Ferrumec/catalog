@@ -2,6 +2,7 @@ use crate::models::{AppState, CreateProductDto, ProductQuery};
 use actix_web::{HttpResponse, Responder, get, post, web};
 use auth_middleware::Claims;
 use ferrumec::CreateItem;
+use tera::Context;
 
 #[post("/products")]
 pub async fn create_product(
@@ -19,6 +20,7 @@ pub async fn create_product(
             state
                 .on_create_product
                 .handle(CreateItem {
+                    name: product.name,
                     id: product.id,
                     sku: product.sku,
                     quantity: dto.qty,
@@ -77,4 +79,28 @@ pub async fn list_products(
             HttpResponse::InternalServerError().finish()
         }
     }
+}
+
+#[get("/")]
+pub async fn index(data: web::Data<AppState>, query: web::Query<ProductQuery>) -> impl Responder {
+    if let Some(cached_htnl) = data.caches.catalog_page.get("full").await {
+        return HttpResponse::Ok()
+            .content_type("text/html")
+            .body(cached_htnl);
+    }
+    let products = match data.repo.find_all(query.into_inner()).await {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("error getting products: {}", e);
+            return HttpResponse::InternalServerError().finish();
+        }
+    };
+    let mut ctx = Context::new();
+    ctx.insert("products", &products);
+    let rendered_html = data.tera.render("catalog.html", &ctx).unwrap();
+    data.caches
+        .catalog_page
+        .insert("catalog".to_string(), rendered_html.clone())
+        .await;
+    HttpResponse::Ok().body(rendered_html)
 }

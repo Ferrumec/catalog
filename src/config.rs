@@ -1,5 +1,5 @@
 use crate::{
-    models::{AppState, Config, DefaultOnCreate},
+    models::{AppState, Caches, Config, DefaultOnCreate},
     repositories::ProductRepository,
     routes,
 };
@@ -9,6 +9,7 @@ use ferrumec::OnCreateHandler;
 use ferrumec::Permission;
 use sqlx::{Error, Pool, Sqlite, sqlite::SqlitePoolOptions};
 use std::env;
+use tera::Tera;
 
 #[derive(Clone)]
 pub struct CatalogModule {
@@ -40,6 +41,8 @@ impl CatalogModule {
     pub async fn default(perms: Vec<Permission>) -> Result<Self, Error> {
         let repo = CatalogModule::default_repo().await?;
         let state = AppState {
+            tera: Tera::new("templates/**/*").unwrap(),
+            caches: Caches::new(),
             repo,
             permissions: CatalogModule::set_permissions(perms),
             on_create_product: Box::new(DefaultOnCreate {}),
@@ -61,6 +64,8 @@ impl CatalogModule {
 
     pub async fn new(cfg: Config) -> Result<CatalogModule, Error> {
         let state = AppState {
+            tera: Tera::new("templates/**/*").unwrap(),
+            caches: Caches::new(),
             repo: cfg.repo.unwrap_or(CatalogModule::default_repo().await?),
             permissions: cfg.permissions.unwrap(),
             on_create_product: cfg
