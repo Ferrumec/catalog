@@ -11,7 +11,7 @@ pub async fn create_product(
     payload: web::Json<CreateProductDto>,
 ) -> impl Responder {
     if !state.permissions.create_product.check(claims.into_inner()) {
-        return HttpResponse::Unauthorized().finish();
+        return HttpResponse::Forbidden().body("Unauthorized");
     }
     let dto = payload.into_inner();
     match state.repo.create(dto.clone()).await {
@@ -83,7 +83,7 @@ pub async fn list_products(
 
 #[get("/")]
 pub async fn index(data: web::Data<AppState>, query: web::Query<ProductQuery>) -> impl Responder {
-    if let Some(cached_htnl) = data.caches.catalog_page.get("full").await {
+    if let Some(cached_htnl) = data.caches.catalog_page.get("catalog").await {
         return HttpResponse::Ok()
             .content_type("text/html")
             .body(cached_htnl);

@@ -80,11 +80,15 @@ impl CatalogModule {
         cfg.service(
             web::scope(namespace)
                 .app_data(self.state.clone())
+                .service(routes::index)
                 .service(routes::list_products)
                 .service(routes::get_product)
                 .service(routes::get_product_by_slug)
-                .wrap(Auth)
-                .service(routes::create_product),
+                .service(
+                    web::scope("") // same prefix as parent
+                        .wrap(Auth)
+                        .service(routes::create_product),
+                ),
         );
     }
 }
