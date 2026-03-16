@@ -2,6 +2,7 @@ use crate::{
     models::{AppState, Caches, Config, DefaultOnCreate},
     repositories::ProductRepository,
     routes,
+    service::Service,
 };
 use actix_web::web::{self, ServiceConfig};
 use auth_middleware::Auth;
@@ -42,6 +43,7 @@ impl CatalogModule {
         let state = AppState {
             tera: Tera::new("templates/**/*").unwrap(),
             caches: Caches::new(),
+            service: Service::new(repo.clone()),
             repo,
             permissions: CatalogModule::set_permissions(perms),
             on_create_product: Box::new(DefaultOnCreate {}),
@@ -62,10 +64,12 @@ impl CatalogModule {
     }
 
     pub async fn new(cfg: Config) -> Result<CatalogModule, Error> {
+        let repo = cfg.repo.unwrap_or(CatalogModule::default_repo().await?);
         let state = AppState {
             tera: Tera::new("templates/**/*").unwrap(),
+            service: Service::new(repo.clone()),
             caches: Caches::new(),
-            repo: cfg.repo.unwrap_or(CatalogModule::default_repo().await?),
+            repo,
             permissions: cfg.permissions.unwrap(),
             on_create_product: cfg
                 .on_create_product

@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use tera::Tera;
 
-use crate::{CatalogModule, config::Permissions, repositories::ProductRepository};
+use crate::{
+    CatalogModule, config::Permissions, repositories::ProductRepository, service::Service,
+};
 
 #[derive(Debug, Serialize, Deserialize, FromRow, Clone)]
 pub struct Product {
@@ -31,7 +33,7 @@ pub struct CreateProductDto {
     pub sku: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Deserialize)]
 pub struct ProductQuery {
     pub q: Option<String>,
     pub min_price: Option<f64>,
@@ -69,6 +71,7 @@ pub struct AppState {
     pub caches: Caches,
     pub tera: Tera,
     pub repo: ProductRepository,
+    pub service: Service,
     pub permissions: Permissions,
     pub on_create_product: Box<dyn OnCreateHandler<Dto = CreateItem>>,
 }

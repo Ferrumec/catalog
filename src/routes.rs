@@ -88,15 +88,23 @@ pub async fn index(data: web::Data<AppState>, query: web::Query<ProductQuery>) -
             .content_type("text/html")
             .body(cached_htnl);
     }
-    let products = match data.repo.find_all(query.into_inner()).await {
+    let products = match data.service.list_products(query.clone().into_inner()).await {
         Ok(r) => r,
-        Err(e) => {
-            eprintln!("error getting products: {}", e);
-            return HttpResponse::InternalServerError().finish();
-        }
+        Err(_e) => return HttpResponse::InternalServerError().finish(),
     };
     let mut ctx = Context::new();
+    let categories = match data.service.get_categories().await {
+        Ok(r) => r,
+        Err(_e) => return HttpResponse::InternalServerError().finish(),
+    };
     ctx.insert("products", &products);
+    ctx.insert("categories", &categories);
+    ctx.insert(
+        "category",
+        &query.category.clone().unwrap_or("==".to_string()),
+    );
+    ctx.insert("sort", "desc");
+    ctx.insert("total_pages", &1);
     let rendered_html = data.tera.render("catalog.html", &ctx).unwrap();
     data.caches
         .catalog_page

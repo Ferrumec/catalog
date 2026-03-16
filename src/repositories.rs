@@ -1,6 +1,9 @@
-use crate::models::{CreateProductDto, Product, ProductQuery};
+use crate::{
+    models::{CreateProductDto, Product, ProductQuery},
+    service::ServiceError,
+};
 use chrono::Utc;
-use sqlx::{Error, QueryBuilder, Row, Sqlite, SqlitePool};
+use sqlx::{Error, QueryBuilder, Row, Sqlite, SqlitePool, query_as, query_scalar};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -114,7 +117,7 @@ impl ProductRepository {
         }))
     }
 
-    pub async fn find_all(&self, query: ProductQuery) -> Result<Vec<Product>, sqlx::Error> {
+    pub async fn find_all(&self, query: ProductQuery) -> Result<Vec<Product>, ServiceError> {
         let mut qb = QueryBuilder::new(
             "SELECT id, name,slug, sku, description, price, category, created_at FROM products WHERE 1=1",
         );
@@ -129,7 +132,7 @@ impl ProductRepository {
         Ok(products)
     }
 
-    pub async fn find_by_slug(&self, slug: &str) -> Result<Option<Product>, sqlx::Error> {
+    pub async fn find_by_slug(&self, slug: &str) -> Result<Option<Product>, Error> {
         let row = sqlx::query(
             "SELECT id, name, description, price, category, slug, created_at
          FROM products
@@ -155,7 +158,13 @@ impl ProductRepository {
         }))
     }
 
-    pub async fn create_table(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    pub async fn get_categories(&self) -> Result<Vec<String>, ServiceError> {
+        Ok(query_scalar::<_, String>("SELECT category FROM products")
+            .fetch_all(&self.pool)
+            .await?)
+    }
+
+    pub async fn create_table(pool: &SqlitePool) -> Result<(), Error> {
         sqlx::query(
             r#"
         CREATE TABLE IF NOT EXISTS products (
