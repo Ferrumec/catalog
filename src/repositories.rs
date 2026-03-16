@@ -3,7 +3,7 @@ use crate::{
     service::ServiceError,
 };
 use chrono::Utc;
-use sqlx::{Error, QueryBuilder, Row, Sqlite, SqlitePool, query_as, query_scalar};
+use sqlx::{Error, QueryBuilder, Row, Sqlite, SqlitePool, query_scalar};
 use uuid::Uuid;
 
 #[derive(Clone)]
