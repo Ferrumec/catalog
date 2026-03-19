@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+<script src="/app/checkout-bar.js"></script>
 <main class="catalog-layout">
   <!-- ========== FILTER SIDEBAR (FORM) ========== -->
   <aside class="filters-panel">
@@ -52,6 +53,7 @@
         <a href="/" class="button clear-filters" role="button">Clear filters</a>
       </div>
     </form>
+    <checkout-bar></checkout-bar>
   </aside>
 
   <!-- ========== PRODUCT LISTING + PAGINATION ========== -->
@@ -75,10 +77,9 @@
           <div class="product-price">{{ product.price }}</div>
           <!-- action links (GET-based cart/order simulation) -->
           <div class="product-actions">
-            <a href="/api/cart/add/{{product.id}}" class="button button-small add-to-cart">Add to
+            <a href="/api/cart/add?product={{product.id}}&qty=1" class="button button-small add-to-cart">Add to
               cart</a>
-            <a href="/order/{{product.id}}"
-              class="button button-small button-primary start-order">Order
+            <a href="/order/{{product.id}}" class="button button-small button-primary start-order">Order
               now</a>
           </div>
         </div>
