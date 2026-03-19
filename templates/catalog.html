@@ -67,7 +67,7 @@
       <article class="product-card">
         <!-- product image with fallback -->
         <div class="product-image">
-          <img src="Tera%20product%20catalog_files/%7B%7B%20product.image_default(value='')%7D%7D"
+          <img src="{{ product.image | default(value='https://picsum.photos/400/400') }}"
             alt="{{ product.name | escape }}" loading="lazy">
         </div>
         <div class="product-details">

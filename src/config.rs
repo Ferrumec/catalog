@@ -91,7 +91,8 @@ impl CatalogModule {
                 .service(
                     web::scope("") // same prefix as parent
                         .wrap(Auth)
-                        .service(routes::create_product),
+                        .service(routes::create_product)
+                        .service(routes::update),
                 ),
         );
     }

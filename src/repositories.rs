@@ -1,5 +1,5 @@
 use crate::{
-    models::{CreateProductDto, Product, ProductQuery},
+    models::{CreateProductDto, Product, ProductQuery, UpdateProductDto},
     service::ServiceError,
 };
 use chrono::Utc;
@@ -162,6 +162,34 @@ impl ProductRepository {
         Ok(query_scalar::<_, String>("SELECT category FROM products")
             .fetch_all(&self.pool)
             .await?)
+    }
+
+    pub async fn update(&self, product_id: String, update: UpdateProductDto) -> Result<(), Error> {
+        let mut qb: QueryBuilder<'_, Sqlite> = QueryBuilder::new("UPDATE products WHERE id = ");
+        qb.push_bind(product_id);
+        qb.push("SET ");
+        if let Some(name) = update.name {
+            qb.push("name = ");
+            qb.push_bind(name);
+        }
+        if let Some(name) = update.category {
+            qb.push("category = ");
+            qb.push_bind(name);
+        }
+        if let Some(name) = update.description {
+            qb.push("description = ");
+            qb.push_bind(name);
+        }
+        if let Some(name) = update.price {
+            qb.push("price = ");
+            qb.push_bind(name);
+        }
+        if let Some(name) = update.sku {
+            qb.push("sku = ");
+            qb.push_bind(name);
+        }
+        let _ = qb.build().execute(&self.pool).await;
+        Ok(())
     }
 
     pub async fn create_table(pool: &SqlitePool) -> Result<(), Error> {

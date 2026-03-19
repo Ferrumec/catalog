@@ -1,4 +1,4 @@
-use crate::models::{AppState, CreateProductDto, ProductQuery};
+use crate::models::{AppState, CreateProductDto, ProductQuery, UpdateProductDto};
 use actix_web::{HttpResponse, Responder, get, post, web};
 use auth_middleware::Claims;
 use ferrumec::CreateItem;
@@ -72,7 +72,7 @@ pub async fn list_products(
     data: web::Data<AppState>,
     query: web::Query<ProductQuery>,
 ) -> impl Responder {
-    match data.repo.find_all(query.into_inner()).await {
+    match data.service.list_products(query.into_inner()).await {
         Ok(products) => HttpResponse::Ok().json(products),
         Err(err) => {
             eprintln!("Error: {:?}", err);
@@ -111,4 +111,23 @@ pub async fn index(data: web::Data<AppState>, query: web::Query<ProductQuery>) -
         .insert("catalog".to_string(), rendered_html.clone())
         .await;
     HttpResponse::Ok().body(rendered_html)
+}
+
+#[post("/products/{id}")]
+pub async fn update(
+    data: web::Data<AppState>,
+    product: web::Path<String>,
+    query: web::Query<UpdateProductDto>,
+) -> impl Responder {
+    match data
+        .repo
+        .update(product.into_inner(), query.into_inner())
+        .await
+    {
+        Ok(_) => HttpResponse::Ok(),
+        Err(e) => {
+            eprintln!("Error in updating product: {}", e);
+            HttpResponse::InternalServerError()
+        }
+    }
 }

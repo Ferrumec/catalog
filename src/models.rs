@@ -33,6 +33,16 @@ pub struct CreateProductDto {
     pub sku: String,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct UpdateProductDto {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub price: Option<f64>,
+    pub category: Option<String>,
+    pub qty: Option<u32>,
+    pub sku: Option<String>,
+}
+
 #[derive(Clone, Deserialize)]
 pub struct ProductQuery {
     pub q: Option<String>,
