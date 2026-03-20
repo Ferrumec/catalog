@@ -1,4 +1,4 @@
-use crate::models::{AppState, CreateProductDto, ProductQuery, UpdateProductDto};
+use crate::models::{AppState, CreateProductDto, SafeProductQuery, UpdateProductDto};
 use actix_web::{HttpResponse, Responder, get, post, web};
 use auth_middleware::Claims;
 use ferrumec::CreateItem;
@@ -70,9 +70,9 @@ pub async fn get_product_by_slug(
 #[get("/products")]
 pub async fn list_products(
     data: web::Data<AppState>,
-    query: web::Query<ProductQuery>,
+    query: web::Query<SafeProductQuery>,
 ) -> impl Responder {
-    match data.service.list_products(query.into_inner()).await {
+    match data.service.list_products(query.into_inner().into()).await {
         Ok(products) => HttpResponse::Ok().json(products),
         Err(err) => {
             eprintln!("Error: {:?}", err);
@@ -82,13 +82,20 @@ pub async fn list_products(
 }
 
 #[get("/")]
-pub async fn index(data: web::Data<AppState>, query: web::Query<ProductQuery>) -> impl Responder {
+pub async fn index(
+    data: web::Data<AppState>,
+    query: web::Query<SafeProductQuery>,
+) -> impl Responder {
     if let Some(cached_htnl) = data.caches.catalog_page.get("catalog").await {
         return HttpResponse::Ok()
             .content_type("text/html")
             .body(cached_htnl);
     }
-    let products = match data.service.list_products(query.clone().into_inner()).await {
+    let products = match data
+        .service
+        .list_products(query.clone().into_inner().into())
+        .await
+    {
         Ok(r) => r,
         Err(_e) => return HttpResponse::InternalServerError().finish(),
     };

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use async_trait::async_trait;
 use ferrumec::{CreateItem, OnCreateHandler, Permission};
@@ -51,6 +51,48 @@ pub struct ProductQuery {
     pub category: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct SafeProductQuery {
+    pub q: Option<String>,
+    pub min_price: Option<String>,
+    pub max_price: Option<String>,
+    pub category: Option<String>,
+    pub limit: Option<String>,
+    pub offset: Option<String>,
+}
+
+fn to_opt_t<T>(val: Option<String>) -> Result<Option<T>, T::Err>
+where
+    T: FromStr,
+{
+    match val {
+        Some(t) => {
+            if t.is_empty() {
+                Ok(None)
+            } else {
+                match T::from_str(&t) {
+                    Ok(t) => Ok(Some(t)),
+                    Err(e) => Err(e),
+                }
+            }
+        }
+        None => Ok(None),
+    }
+}
+
+impl From<SafeProductQuery> for ProductQuery {
+    fn from(value: SafeProductQuery) -> Self {
+        Self {
+            q: to_opt_t(value.q).unwrap(),
+            min_price: to_opt_t(value.min_price).unwrap(),
+            max_price: to_opt_t(value.max_price).unwrap(),
+            category: to_opt_t(value.category).unwrap(),
+            limit: to_opt_t(value.limit).unwrap(),
+            offset: to_opt_t(value.offset).unwrap(),
+        }
+    }
 }
 
 pub struct DefaultOnCreate;
