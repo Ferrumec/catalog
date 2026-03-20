@@ -63,34 +63,37 @@ pub struct SafeProductQuery {
     pub offset: Option<String>,
 }
 
-fn to_opt_t<T>(val: Option<String>) -> Result<Option<T>, T::Err>
+fn to_opt_t<T>(string: Option<String>) -> Option<T>
 where
     T: FromStr,
 {
-    match val {
+    match string {
         Some(t) => {
             if t.is_empty() {
-                Ok(None)
+                None
             } else {
                 match T::from_str(&t) {
-                    Ok(t) => Ok(Some(t)),
-                    Err(e) => Err(e),
+                    Ok(t) => Some(t),
+                    Err(_) => {
+                        eprintln!("Error parsing value defaulting to None");
+                        None
+                    }
                 }
             }
         }
-        None => Ok(None),
+        None => None,
     }
 }
 
 impl From<SafeProductQuery> for ProductQuery {
     fn from(value: SafeProductQuery) -> Self {
         Self {
-            q: to_opt_t(value.q).unwrap(),
-            min_price: to_opt_t(value.min_price).unwrap(),
-            max_price: to_opt_t(value.max_price).unwrap(),
-            category: to_opt_t(value.category).unwrap(),
-            limit: to_opt_t(value.limit).unwrap(),
-            offset: to_opt_t(value.offset).unwrap(),
+            q: to_opt_t(value.q),
+            min_price: to_opt_t(value.min_price),
+            max_price: to_opt_t(value.max_price),
+            category: to_opt_t(value.category),
+            limit: to_opt_t(value.limit),
+            offset: to_opt_t(value.offset),
         }
     }
 }
