@@ -1,6 +1,7 @@
-use std::{str::FromStr, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
+use event_stream::EventStream;
 use ferrumec::{CreateItem, OnCreateHandler, Permission};
 use moka::future::Cache;
 use serde::{Deserialize, Serialize};
@@ -128,7 +129,7 @@ pub struct AppState {
     pub repo: ProductRepository,
     pub service: Service,
     pub permissions: Permissions,
-    pub on_create_product: Box<dyn OnCreateHandler<Dto = CreateItem>>,
+    pub es: Arc<dyn EventStream>,
 }
 
 pub struct Config {
