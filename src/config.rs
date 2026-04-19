@@ -1,5 +1,5 @@
 use crate::{
-    models::{AppState, Caches, Config, DefaultOnCreate},
+    models::{AppState, Caches},
     repositories::ProductRepository,
     routes,
     service::Service,
@@ -10,8 +10,8 @@ use ferrumec::middleware::Auth;
 use event_stream::EventStream;
 use ferrumec::Permission;
 use serde::Deserialize;
-use sqlx::{Error, Pool, Sqlite, sqlite::SqlitePoolOptions};
-use std::{env, sync::Arc};
+use sqlx::{Error, Pool, Sqlite};
+use std::sync::Arc;
 use tera::Tera;
 
 #[derive(Clone)]
