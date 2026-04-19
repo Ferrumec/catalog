@@ -12,7 +12,6 @@ uuid = { version = "1", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 thiserror = "1"
-auth_middleware = {git="https://github.com/Austin-rgb/auth_middleware"}
 ferrumec = {git="https://github.com/Austin-rgb/ferrumec"}
 async-trait = "0.1.89"
 moka = { version = "0.12.13", features = ["future"] }
