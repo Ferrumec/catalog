@@ -1,6 +1,6 @@
 use crate::models::{AppState, CreateProductDto, SafeProductQuery, UpdateProductDto};
 use actix_web::{HttpResponse, Responder, get, post, web};
-use auth_middleware::Claims;
+use Ferrumec::crypto::Claims;
 use ferrumec::CreateItem;
 use serde_json::to_string;
 use tera::Context;
