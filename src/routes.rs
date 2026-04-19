@@ -1,7 +1,7 @@
 use crate::models::{AppState, CreateProductDto, SafeProductQuery, UpdateProductDto};
 use actix_web::{HttpResponse, Responder, get, post, web};
-use ferrumec::crypto::Claims;
 use ferrumec::CreateItem;
+use ferrumec::crypto::Claims;
 use serde_json::to_string;
 use tera::Context;
 
@@ -18,17 +18,20 @@ pub async fn create_product(
     match state.repo.create(dto.clone()).await {
         Ok(product) => {
             let prod = product.clone();
-            state.es.publish(
-                "product-created".to_string(),
-                to_string(&CreateItem {
-                    name: product.name,
-                    id: product.id,
-                    sku: product.sku,
-                    quantity: dto.qty,
-                })
-                .unwrap()
-                .into_bytes(),
-            );
+            state
+                .es
+                .publish(
+                    "product-created".to_string(),
+                    to_string(&CreateItem {
+                        name: product.name,
+                        id: product.id,
+                        sku: product.sku,
+                        quantity: dto.qty,
+                    })
+                    .unwrap()
+                    .into_bytes(),
+                )
+                .await;
             HttpResponse::Created().json(prod)
         }
         Err(err) => {
