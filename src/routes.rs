@@ -1,9 +1,9 @@
 use crate::models::{AppState, CreateProductDto, SafeProductQuery, UpdateProductDto};
 use actix_web::{HttpResponse, Responder, get, post, web};
-use e2schema::domain::catalog::Money;
-use e2schema::domain::catalog::ProductCreated;
-use e2schema::events::envelop::Event;
-use ferrumec::crypto::Claims;
+use e2schema::catalog::Money;
+use e2schema::catalog::ProductCreated;
+use e2schema::Event;
+use libsigners::Claims;
 use serde_json::to_string;
 use tera::Context;
 
@@ -31,7 +31,7 @@ pub async fn create_product(
                 },
                 product_id: product.id,
             };
-            let envelop = Event::new("normal", "catalog", event);
+            let envelop = Event::new( "catalog", event);
             let _ = state
                 .es
                 .publish(

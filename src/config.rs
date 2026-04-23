@@ -5,7 +5,7 @@ use crate::{
     service::Service,
 };
 use actix_web::web::{self, ServiceConfig};
-use ferrumec::crypto::Validate;
+use ferrumec::deps::signers::Validate;
 use ferrumec::middleware::Auth;
 use event_stream::EventStream;
 use ferrumec::Permission;
