@@ -416,7 +416,6 @@ dependencies = [
  "actix-web",
  "async-trait",
  "chrono",
- "dotenvy",
  "e2schema",
  "event-stream",
  "ferrumec",
@@ -426,7 +425,6 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tera",
- "thiserror 1.0.69",
  "uuid",
 ]
 
