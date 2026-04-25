@@ -1,6 +1,5 @@
 use std::{str::FromStr, sync::Arc, time::Duration};
 
-use async_trait::async_trait;
 use event_stream::EventStream;
 use ferrumec::{CreateItem, OnCreateHandler, Permission};
 use moka::future::Cache;
@@ -96,17 +95,6 @@ impl From<SafeProductQuery> for ProductQuery {
             limit: to_opt_t(value.limit),
             offset: to_opt_t(value.offset),
         }
-    }
-}
-
-pub struct DefaultOnCreate;
-
-#[async_trait]
-impl OnCreateHandler for DefaultOnCreate {
-    type Dto = CreateItem;
-    async fn handle(&self, dto: CreateItem) -> bool {
-        println!("Default on create handler: {}", dto.id);
-        true
     }
 }
 

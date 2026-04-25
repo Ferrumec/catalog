@@ -2,9 +2,10 @@ use crate::models::{AppState, CreateProductDto, SafeProductQuery, UpdateProductD
 use actix_web::{HttpResponse, Responder, get, post, web};
 use e2schema::catalog::Money;
 use e2schema::catalog::ProductCreated;
-use e2schema::Event;
+use e2schema::EventMetaData;
+use event_stream::Publishable;
 use libsigners::Claims;
-use serde_json::to_string;
+
 use tera::Context;
 
 #[post("/products")]
@@ -22,6 +23,7 @@ pub async fn create_product(
             let prod = product.clone();
             let event = ProductCreated {
                 category_id: product.category,
+ _emd:EventMetaData::new("catalog"),
                 name: product.name,
                 attributes: None,
                 sku: product.sku,
@@ -31,14 +33,7 @@ pub async fn create_product(
                 },
                 product_id: product.id,
             };
-            let envelop = Event::new( "catalog", event);
-            let _ = state
-                .es
-                .publish(
-                    "product-created".to_string(),
-                    to_string(&envelop).unwrap().into_bytes(),
-                )
-                .await;
+let _ = event.publish(state.es.clone()).await;
             HttpResponse::Created().json(prod)
         }
         Err(err) => {
