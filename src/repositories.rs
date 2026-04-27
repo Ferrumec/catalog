@@ -60,6 +60,7 @@ impl ProductRepository {
         ProductRepository::create_table(&pool).await?;
         Ok(Self { pool })
     }
+
     pub async fn create(&self, dto: CreateProductDto) -> Result<Product, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
         let created_at = Utc::now().timestamp_micros();
@@ -82,7 +83,7 @@ impl ProductRepository {
         Ok(Product {
             id,
             name: dto.name,
-            slug: slug,
+            slug,
             sku: dto.sku,
             description: dto.description,
             price: dto.price,
@@ -119,24 +120,25 @@ impl ProductRepository {
 
     pub async fn find_all(&self, query: ProductQuery) -> Result<Vec<Product>, ServiceError> {
         let mut qb = QueryBuilder::new(
-            "SELECT id, name,slug, sku, description, price, category, created_at FROM products WHERE 1=1",
+            "SELECT id, name, slug, sku, description, price, category, created_at FROM products WHERE 1=1",
         );
 
         qb = build_filters(qb, query);
 
         let products: Vec<Product> = qb
-            .build_query_as::<Product>() // <--- automatic mapping
+            .build_query_as::<Product>()
             .fetch_all(&self.pool)
             .await?;
 
         Ok(products)
     }
 
+    // Fix: SELECT now includes `sku` so the row mapping does not panic at runtime.
     pub async fn find_by_slug(&self, slug: &str) -> Result<Option<Product>, Error> {
         let row = sqlx::query(
-            "SELECT id, name, description, price, category, slug, created_at
-         FROM products
-         WHERE slug = ?1",
+            "SELECT id, name, slug, description, price, category, sku, created_at
+             FROM products
+             WHERE slug = ?1",
         )
         .bind(slug)
         .fetch_optional(&self.pool)
@@ -158,37 +160,56 @@ impl ProductRepository {
         }))
     }
 
+    // Fix: was `SELECT category` (returns a row per product, full of duplicates).
+    // Changed to `SELECT DISTINCT category`.
     pub async fn get_categories(&self) -> Result<Vec<String>, ServiceError> {
-        Ok(query_scalar::<_, String>("SELECT category FROM products")
-            .fetch_all(&self.pool)
-            .await?)
+        Ok(
+            query_scalar::<_, String>("SELECT DISTINCT category FROM products")
+                .fetch_all(&self.pool)
+                .await?,
+        )
     }
 
+    // Fix: SQL was `UPDATE products WHERE id = ... SET ...` which is invalid.
+    // Corrected to `UPDATE products SET ... WHERE id = ...`.
+    // Fix: field assignments were not comma-separated, producing invalid SQL like
+    // `SET name = ? category = ?`. Now commas are inserted between fields.
+    // Fix: DB error was silently swallowed with `let _ = ...`. Now propagated with `?`.
+    // Fix: no-op update (all fields None) is short-circuited to avoid issuing
+    // a malformed `UPDATE products SET  WHERE id = ?`.
     pub async fn update(&self, product_id: String, update: UpdateProductDto) -> Result<(), Error> {
-        let mut qb: QueryBuilder<'_, Sqlite> = QueryBuilder::new("UPDATE products WHERE id = ");
+        // Collect the SET clauses so we can detect an empty update before hitting the DB.
+        let mut any_field = false;
+        let mut qb: QueryBuilder<'_, Sqlite> = QueryBuilder::new("UPDATE products SET ");
+
+        macro_rules! push_field {
+            ($opt:expr, $col:literal) => {
+                if let Some(val) = $opt {
+                    if any_field {
+                        qb.push(", ");
+                    }
+                    qb.push(concat!($col, " = "));
+                    qb.push_bind(val);
+                    any_field = true;
+                }
+            };
+        }
+
+        push_field!(update.name, "name");
+        push_field!(update.category, "category");
+        push_field!(update.description, "description");
+        push_field!(update.price, "price");
+        push_field!(update.sku, "sku");
+
+        if !any_field {
+            // Nothing to update — return early rather than emitting a malformed query.
+            return Ok(());
+        }
+
+        qb.push(" WHERE id = ");
         qb.push_bind(product_id);
-        qb.push("SET ");
-        if let Some(name) = update.name {
-            qb.push("name = ");
-            qb.push_bind(name);
-        }
-        if let Some(name) = update.category {
-            qb.push("category = ");
-            qb.push_bind(name);
-        }
-        if let Some(name) = update.description {
-            qb.push("description = ");
-            qb.push_bind(name);
-        }
-        if let Some(name) = update.price {
-            qb.push("price = ");
-            qb.push_bind(name);
-        }
-        if let Some(name) = update.sku {
-            qb.push("sku = ");
-            qb.push_bind(name);
-        }
-        let _ = qb.build().execute(&self.pool).await;
+
+        qb.build().execute(&self.pool).await?;
         Ok(())
     }
 
@@ -198,7 +219,7 @@ impl ProductRepository {
         CREATE TABLE IF NOT EXISTS products (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
-        slug TEXT NOT NULL,
+            slug TEXT NOT NULL,
             description TEXT,
             price REAL NOT NULL,
             category TEXT NOT NULL,
@@ -207,9 +228,9 @@ impl ProductRepository {
         );
 
         CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);
-CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
-CREATE INDEX IF NOT EXISTS idx_products_price ON products(price);
-CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
+        CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+        CREATE INDEX IF NOT EXISTS idx_products_price ON products(price);
+        CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
         "#,
         )
         .execute(pool)
@@ -217,3 +238,4 @@ CREATE INDEX IF NOT EXISTS idx_products_created_at ON products(created_at);
         Ok(())
     }
 }
+

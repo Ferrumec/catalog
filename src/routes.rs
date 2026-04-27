@@ -1,11 +1,10 @@
 use crate::models::{AppState, CreateProductDto, SafeProductQuery, UpdateProductDto};
-use actix_web::{HttpResponse, Responder, get, post, web};
+use actix_web::{HttpResponse, Responder, get, patch, post, web};
 use e2schema::catalog::Money;
 use e2schema::catalog::ProductCreated;
 use e2schema::EventMetaData;
 use event_stream::Publishable;
 use libsigners::Claims;
-
 use tera::Context;
 
 #[post("/products")]
@@ -23,7 +22,7 @@ pub async fn create_product(
             let prod = product.clone();
             let event = ProductCreated {
                 category_id: product.category,
- _emd:EventMetaData::new("catalog"),
+                _emd: EventMetaData::new("catalog"),
                 name: product.name,
                 attributes: None,
                 sku: product.sku,
@@ -33,7 +32,7 @@ pub async fn create_product(
                 },
                 product_id: product.id,
             };
-let _ = event.publish(state.es.clone()).await;
+            let _ = event.publish(state.es.clone()).await;
             HttpResponse::Created().json(prod)
         }
         Err(err) => {
@@ -94,55 +93,95 @@ pub async fn index(
     data: web::Data<AppState>,
     query: web::Query<SafeProductQuery>,
 ) -> impl Responder {
-    if let Some(cached_htnl) = data.caches.catalog_page.get("catalog").await {
+    // Fix: cache key now incorporates the query so that filtered/paginated
+    // requests do not poison or incorrectly serve the cached default view.
+    let query_inner: SafeProductQuery = query.into_inner();
+    let product_query = query_inner.clone().into();
+
+    // Build a simple string key from the raw SafeProductQuery fields.
+    let cache_key = format!(
+        "catalog:q={:?}:cat={:?}:min={:?}:max={:?}:limit={:?}:offset={:?}",
+        query_inner.q,
+        query_inner.category,
+        query_inner.min_price,
+        query_inner.max_price,
+        query_inner.limit,
+        query_inner.offset,
+    );
+
+    if let Some(cached_html) = data.caches.catalog_page.get(&cache_key).await {
         return HttpResponse::Ok()
             .content_type("text/html")
-            .body(cached_htnl);
+            .body(cached_html);
     }
-    let products = match data
-        .service
-        .list_products(query.clone().into_inner().into())
-        .await
-    {
+
+    let products = match data.service.list_products(product_query).await {
         Ok(r) => r,
         Err(_e) => return HttpResponse::InternalServerError().finish(),
     };
-    let mut ctx = Context::new();
+
     let categories = match data.service.get_categories().await {
         Ok(r) => r,
         Err(_e) => return HttpResponse::InternalServerError().finish(),
     };
+
+    // Fix: `total_pages` was hardcoded to 1. Now derived from the actual product
+    // count and the active limit. Falls back to page 1 when the list is empty.
+    let limit = query_inner
+        .limit
+        .as_deref()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(20);
+    let total_pages = if products.is_empty() {
+        1
+    } else {
+        // Ceiling division: this is an approximation based on what was fetched.
+        // For exact pagination a COUNT query would be needed; this is a best-effort
+        // value until a dedicated count endpoint is added.
+        (products.len() + limit - 1) / limit
+    };
+
+    let mut ctx = Context::new();
     ctx.insert("products", &products);
     ctx.insert("categories", &categories);
     ctx.insert(
         "category",
-        &query.category.clone().unwrap_or("==".to_string()),
+        &query_inner.category.clone().unwrap_or_default(),
     );
     ctx.insert("sort", "desc");
-    ctx.insert("total_pages", &1);
+    ctx.insert("total_pages", &total_pages);
+
     let rendered_html = data.tera.render("catalog.html", &ctx).unwrap();
     data.caches
         .catalog_page
-        .insert("catalog".to_string(), rendered_html.clone())
+        .insert(cache_key, rendered_html.clone())
         .await;
-    HttpResponse::Ok().body(rendered_html)
+
+    HttpResponse::Ok()
+        .content_type("text/html")
+        .body(rendered_html)
 }
 
-#[post("/products/{id}")]
+// Fix: changed from `#[post]` to `#[patch]` — a partial update should use PATCH
+// (or PUT for a full replacement), not POST which conventionally creates resources.
+// Fix: update payload changed from `web::Query` (query string) to `web::Json`
+// (request body), which is the correct extractor for a JSON update payload.
+#[patch("/products/{id}")]
 pub async fn update(
     data: web::Data<AppState>,
     product: web::Path<String>,
-    query: web::Query<UpdateProductDto>,
+    payload: web::Json<UpdateProductDto>,
 ) -> impl Responder {
     match data
         .repo
-        .update(product.into_inner(), query.into_inner())
+        .update(product.into_inner(), payload.into_inner())
         .await
     {
-        Ok(_) => HttpResponse::Ok(),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => {
-            eprintln!("Error in updating product: {}", e);
-            HttpResponse::InternalServerError()
+            eprintln!("Error updating product: {}", e);
+            HttpResponse::InternalServerError().finish()
         }
     }
 }
+

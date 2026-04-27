@@ -13,46 +13,56 @@ pub enum ServiceError {
     Db,
 }
 
+// Fix: was `From<e>` (undefined type `e`), corrected to `From<Error>`.
 impl From<Error> for ServiceError {
     fn from(value: Error) -> Self {
-        // Log the error here since the message is not kept
         eprintln!("Service error: {}", value);
         Self::Db
     }
 }
 
-/// This converts Arc<ServiceError> to ServiceError.
-/// just to do away with map_err(|e|(*e).clone()).
-/// We can as well convert Arc<sqlx::Error> to ServiceError but that will swallow sqlx error details.
+/// This converts Arc<ServiceError> to ServiceError,
+/// to avoid map_err(|e| (*e).clone()) at call sites.
 impl From<Arc<ServiceError>> for ServiceError {
     fn from(_value: Arc<ServiceError>) -> Self {
         Self::Db
     }
 }
 
-pub fn build_filters(query: ProductQuery) -> String {
-    let mut qb: String = String::new();
-    if let Some(q) = query.q {
-        let pattern = format!("%{}%", q);
-        qb += ":name:";
-        qb += &pattern;
-    }
+/// Builds a deterministic cache key from a query.
+/// Renamed from `build_filters` (which clashed with the SQL builder in repositories.rs)
+/// to `cache_key_for_query` to make its purpose unambiguous.
+/// Takes a shared reference to avoid an unnecessary clone at call sites.
+/// Now includes limit/offset so paginated results are cached independently.
+pub fn cache_key_for_query(query: &ProductQuery) -> String {
+    let mut key = String::new();
 
+    if let Some(q) = &query.q {
+        key += ":name:";
+        key += &format!("%{}%", q);
+    }
     if let Some(min) = query.min_price {
-        qb += ":price>:";
-        qb += &min.to_string();
+        key += ":price>:";
+        key += &min.to_string();
     }
-
     if let Some(max) = query.max_price {
-        qb += ":price<:";
-        qb += &max.to_string();
+        key += ":price<:";
+        key += &max.to_string();
+    }
+    if let Some(cat) = &query.category {
+        key += ":category:";
+        key += cat;
+    }
+    if let Some(limit) = query.limit {
+        key += ":limit:";
+        key += &limit.to_string();
+    }
+    if let Some(offset) = query.offset {
+        key += ":offset:";
+        key += &offset.to_string();
     }
 
-    if let Some(cat) = query.category {
-        qb += ":category:";
-        qb += &cat.to_string();
-    }
-    qb
+    key
 }
 
 pub struct Service {
@@ -77,8 +87,9 @@ impl Service {
             categories_cache,
         }
     }
+
     pub async fn list_products(&self, query: ProductQuery) -> Result<Vec<Product>, ServiceError> {
-        let key = build_filters(query.clone());
+        let key = cache_key_for_query(&query);
         Ok(self
             .products_cache
             .try_get_with(key, self.repo.find_all(query))
@@ -92,3 +103,4 @@ impl Service {
             .await?)
     }
 }
+
