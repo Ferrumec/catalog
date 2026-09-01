@@ -1,0 +1,43 @@
+[package]
+name = "catalog"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-web = "4.4"
+actix-multipart = "0.6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.145"
+chrono = { version = "0.4", features = ["serde"] }
+sqlx = { version = "0.9", features = ["postgres", "runtime-tokio", "tls-native-tls", "chrono", "migrate", "uuid"] }
+thiserror = "1.0"
+uuid = { version = "1.7", features = ["v4", "serde"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+typed-eventbus = "0.2.1"
+# actixutils::middleware::RequestId (app-wide, for trace-id correlation
+# on published events — see main.rs/handlers/versions.rs::trace_id).
+# actixutils::middleware::ReadContext<T>/Context weren't usable here —
+# see the doc comment on AppState::publish in state.rs for why — so
+# events are published straight through typed-eventbus's EventStream
+# instead of going through actixutils' Context wrapper.
+actixutils = { version = "0.6.4", features = ["es"] }
+async-trait = "0.1.89"
+tar = "0.4"
+flate2 = "1.0"
+sha2 = "0.10.9"
+tokio = { version = "1.53.1", features = ["full"] }
+futures-util = "0.3.34"
+validator = { version = "0.20.0", features = ["derive"] }
+tempfile = "3.10"
+
+[features]
+# Runs `cargo check`/`cargo audit` against extracted uploads for real.
+# Disabled by default in environments without a build toolchain / network
+# egress to crates.io (e.g. some CI or sandboxed dev setups) — see
+# README.md "Validation pipeline" for the degraded-mode behavior.
+real_compile_checks = []
+
+[[bin]]
+name = "catalog"
+path = "src/main.rs"
